@@ -1,0 +1,149 @@
+import 'package:dnd_kit_core/dnd_kit_core.dart';
+import 'package:flutter/foundation.dart';
+
+/// Coordinates Flutter adapter drag state while keeping user data external.
+class DndController extends ChangeNotifier {
+  /// Creates a drag controller.
+  DndController({DndState initialState = const DndIdle()}) : _state = initialState;
+
+  DndState _state;
+
+  /// Registered draggable and droppable metadata for this controller.
+  final DndRegistry registry = DndRegistry();
+
+  /// The current drag lifecycle state.
+  DndState get state => _state;
+
+  /// Whether no drag is active or pending.
+  bool get isIdle => _state is DndIdle;
+
+  /// Whether a drag session is currently active.
+  bool get isDragging => _state is DndDragging;
+
+  /// The active session when a drag is moving or dropping.
+  DndDragSession? get activeSession {
+    return switch (_state) {
+      DndDragging(:final session) || DndDropping(:final session) => session,
+      _ => null,
+    };
+  }
+
+  /// The active draggable id when one is pending, dragging, dropping, or cancelled.
+  DndId? get activeId {
+    return switch (_state) {
+      DndPending(:final activeId) => activeId,
+      DndDragging(:final session) || DndDropping(:final session) => session.activeId,
+      DndCancelled(:final activeId) => activeId,
+      DndIdle() => null,
+    };
+  }
+
+  /// Starts pending activation for [event].
+  void beginDrag(DndSensorActivationEvent event) {
+    _setState(
+      DndPending(
+        activeId: event.activeId,
+        initialPointer: event.position,
+        inputKind: event.inputKind,
+      ),
+    );
+  }
+
+  /// Promotes a pending drag into an active session.
+  DndDragStartEvent? startDrag() {
+    final current = _state;
+    if (current is! DndPending) {
+      assert(false, 'Cannot start a drag when the controller is not pending.');
+      return null;
+    }
+
+    final next = DndDragging(session: current.startSession());
+    _setState(next);
+    return DndDragStartEvent(session: next.session);
+  }
+
+  /// Moves the active drag session to [position].
+  DndDragMoveEvent? moveDrag(DndPoint position) {
+    final current = _state;
+    if (current is! DndDragging) {
+      assert(false, 'Cannot move a drag when the controller is not dragging.');
+      return null;
+    }
+
+    final next = DndDragging(session: current.session.moveTo(position));
+    _replaceState(next);
+    return DndDragMoveEvent(session: next.session);
+  }
+
+  /// Ends the active drag session and moves into dropping state.
+  DndDragEndEvent? endDrag({DndId? overId}) {
+    final current = _state;
+    if (current is! DndDragging) {
+      assert(false, 'Cannot end a drag when the controller is not dragging.');
+      return null;
+    }
+
+    final next = DndDropping(session: current.session);
+    _setState(next);
+    return DndDragEndEvent(session: next.session, overId: overId);
+  }
+
+  /// Cancels a pending or active drag.
+  DndDragCancelEvent? cancelDrag({DndCancelReason reason = DndCancelReason.user}) {
+    final current = _state;
+    final event = switch (current) {
+      DndPending(:final activeId) => DndDragCancelEvent(
+          activeId: activeId,
+          reason: reason,
+        ),
+      DndDragging(:final session) => DndDragCancelEvent(
+          activeId: session.activeId,
+          session: session,
+          reason: reason,
+        ),
+      _ => null,
+    };
+
+    if (event == null) {
+      assert(false, 'Cannot cancel a drag when the controller is idle or dropping.');
+      return null;
+    }
+
+    _setState(DndCancelled(activeId: event.activeId, reason: reason));
+    return event;
+  }
+
+  /// Returns a dropping or cancelled controller to idle.
+  void reset() {
+    final current = _state;
+    if (current is DndIdle) {
+      return;
+    }
+
+    if (current is! DndDropping && current is! DndCancelled) {
+      assert(false, 'Cannot reset before a drag has dropped or cancelled.');
+      return;
+    }
+
+    _setState(const DndIdle());
+  }
+
+  void _setState(DndState next) {
+    final current = _state;
+    if (current == next) {
+      return;
+    }
+
+    _state = current.transitionTo(next);
+    notifyListeners();
+  }
+
+  void _replaceState(DndState next) {
+    if (_state == next) {
+      return;
+    }
+
+    _state = next;
+    notifyListeners();
+  }
+}
