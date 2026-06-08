@@ -6,4 +6,5 @@ export 'src/geometry.dart';
 export 'src/id.dart';
 export 'src/collision.dart';
 export 'src/events.dart';
+export 'src/modifier.dart';
 export 'src/state.dart';
