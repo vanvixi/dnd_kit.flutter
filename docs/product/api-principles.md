@@ -56,7 +56,12 @@ data with `setState`, Riverpod, BLoC, Provider, Redux, or any other approach.
 
 ## Stable IDs
 
-`DndId` values must be stable during the widget lifecycle.
+`DndId` wraps an application-owned `String` value. The value must be stable
+during the widget lifecycle and is compared as an exact string match.
+
+The library does not trim, case-fold, normalize, parse, or namespace ID values.
+Applications should pass the same canonical string they use to identify the
+underlying item, container, or user-owned entity.
 
 Prefer:
 
@@ -64,15 +69,22 @@ Prefer:
 DndId(task.id)
 DndId('column-todo')
 DndId(user.id)
+DndId('column:${column.id}/task:${task.id}')
 ```
 
 Avoid:
 
 ```dart
-DndId(UniqueKey())
-DndId(DateTime.now())
-DndId(Object())
+DndId('')
+DndId('   ')
+DndId(UniqueKey().toString())
+DndId(DateTime.now().toIso8601String())
+DndId(Object().toString())
 ```
+
+Empty values are invalid. Whitespace-only values should be treated as invalid
+by application code because they make diagnostics and duplicate detection hard
+to understand.
 
 Duplicate IDs inside a registry should be caught by debug diagnostics.
 
