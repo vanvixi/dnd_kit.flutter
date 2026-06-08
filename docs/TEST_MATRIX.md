@@ -2,8 +2,7 @@
 
 This file maps product behavior to proof.
 
-No product behavior has been defined or implemented yet. Do not mark a row
-implemented until tests or validation evidence exist.
+Do not mark a row implemented until tests or validation evidence exist.
 
 ## Status Values
 
@@ -19,7 +18,7 @@ implemented until tests or validation evidence exist.
 
 | Story | Contract | Unit | Integration | E2E | Platform | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| TBD | Add rows when story packets are created | no | no | no | no | planned | none |
+| US-001 | Repository foundation and package boundaries | yes | no | no | no | implemented | `story verify US-001`; `fvm dart analyze`; `melos run analyze` |
 
 ## Evidence Rules
 

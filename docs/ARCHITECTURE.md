@@ -1,133 +1,70 @@
 # Architecture
 
-No application stack is selected yet.
+This repository now targets `dnd_kit`, a Flutter drag-and-drop toolkit with a
+pure Dart core, Flutter adapter, sortable presets, and an umbrella package.
 
-No application code exists yet. This document defines generic architecture
-questions and boundary rules that future implementation should adapt after a
-user-provided spec and stack decision exist.
+The detailed living product contract is split across:
 
-## Discovery Before Shape
+- `docs/product/overview.md`
+- `docs/product/package-architecture.md`
+- `docs/product/api-principles.md`
+- `docs/product/release-roadmap.md`
 
-Before proposing implementation shape, identify:
+The seed specification remains in `SPEC.md` as historical input material.
 
-- Product surfaces: browser, mobile, desktop, CLI, API, worker, or service.
-- Runtime stack: language, framework, database, queues, providers, and hosting.
-- Core domains: the product concepts that deserve stable names and contracts.
-- Boundary inputs: user input, API requests, webhooks, jobs, files, credentials,
-  provider payloads, and environment configuration.
-- Validation ladder: the smallest checks that can prove the selected stack.
+## Product Surfaces
 
-Record stack choices in `docs/decisions/` when they meaningfully constrain
-future work.
+- Pure Dart package APIs for geometry, state, collision, modifier, sensor, and
+  sortable math.
+- Flutter widget APIs for drag scopes, controllers, draggables, droppables,
+  handles, overlays, measuring, sensors, auto-scroll, and accessibility.
+- Sortable preset APIs for vertical lists, horizontal lists, and grids.
+- Example Flutter apps used as adoption guides and integration proof.
 
-## Default Layering
-
-```text
-domain
-  <- application
-      <- infrastructure
-          <- interface
-              <- app surfaces
-```
-
-## Candidate Structure
+## Package Layers
 
 ```text
-app/
-  domain/
-    entities/
-    value-objects/
-    repositories/
-    services/
-
-  application/
-    commands/
-    queries/
-    handlers/
-
-  infrastructure/
-    database/
-    logging/
-    notifications/
-
-  interface/
-    controllers/
-    dto/
-    presenters/
-    routes/
-    middlewares/
-
-surfaces/
-  browser/
-  mobile/
-  desktop/
-  cli/
+dnd_kit_core
+  <- dnd_kit_flutter
+      <- dnd_kit_sortable
+          <- dnd_kit umbrella exports
 ```
 
-This is a thinking template, not a scaffold. Create real folders only when a
-story enters implementation and the selected stack needs them.
+`dnd_kit_sortable` also depends directly on `dnd_kit_core` for sortable math
+and IDs.
 
 ## Dependency Rule
 
-Inner layers must not depend on outer layers.
+Inner packages must not depend on outer packages.
 
-| Layer | May depend on | Must not depend on |
+| Package | May depend on | Must not depend on |
 | --- | --- | --- |
-| domain | nothing project-external except tiny pure utilities | framework, database, UI, provider, process/env |
-| application | domain | framework, UI, provider, database concrete clients |
-| infrastructure | domain, application | interface controllers or UI |
-| interface | all backend layers | UI state or platform shell assumptions |
-| app surfaces | API contracts and app-facing clients | domain internals directly |
+| `dnd_kit_core` | `collection`, `meta`, Dart SDK | Flutter, `dart:ui`, widget/render/gesture APIs, state management packages |
+| `dnd_kit_flutter` | Flutter SDK, `dnd_kit_core`, small annotations/utilities | sortable presets, umbrella package, external state management |
+| `dnd_kit_sortable` | `dnd_kit_core`, `dnd_kit_flutter`, Flutter SDK | umbrella package, app-specific state management |
+| `dnd_kit` | public sub-packages | implementation internals |
 
-## Parse-First Boundary Rule
+## Boundary Rules
 
-Unknown data must be parsed at boundaries before it enters inner code.
+Core geometry must use `DndPoint`, `DndSize`, `DndRect`, and `DndTransform`
+rather than Flutter geometry types.
 
-Boundaries include:
+Flutter geometry conversion belongs at adapter boundaries. Unknown Flutter
+layout data should be measured and normalized before entering collision or
+modifier logic.
 
-- HTTP request bodies, params, and query strings.
-- Session payloads and identity claims.
-- Environment variables.
-- Database rows returned from external clients.
-- Platform shell payloads.
-- Deep links, tokens, and signed URLs.
-- Provider webhooks, events, and async payloads.
+User data remains outside the library. Drag/drop and sortable APIs report
+intent; applications own mutation.
 
-Target flow:
+## Validation Ladder
 
-```text
-unknown input
-  -> parser
-  -> typed DTO or command
-  -> application use case
-  -> domain object/value object
-```
+- Core stories use `dart test` and `dart analyze`.
+- Flutter adapter stories use `flutter test` for widget and gesture behavior.
+- Example and showcase stories add integration or platform build checks when
+  they introduce user-visible flows.
+- Release hardening adds `melos run test`, `melos run analyze`, and example
+  build checks.
 
-Inner layers should work with meaningful product types such as `UserId`,
-`AccountId`, `WorkspaceId`, `Role`, `DateRange`, or domain-specific IDs,
-rather than repeatedly validating raw strings.
+## Decisions
 
-## Command/Query Boundary
-
-If the product has both reads and writes, keep command/query separation clear at
-the code level even when the storage layer is simple:
-
-- Commands mutate state and own audit side effects.
-- Queries read state and format for consumers.
-- Shared domain rules live in domain/application, not controllers.
-
-## Observability Contract
-
-The future server should emit one canonical JSON log line per request with:
-
-- timestamp
-- level
-- request_id
-- user_id when known
-- action
-- duration_ms
-- status_code
-- message
-
-Audit logs are product records. Application logs are operational records. Do not
-use one as a substitute for the other.
+- `docs/decisions/0007-dnd-kit-package-architecture.md`
