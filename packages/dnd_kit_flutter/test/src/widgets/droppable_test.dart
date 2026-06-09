@@ -127,6 +127,92 @@ void main() {
       );
     });
 
+    testWidgets('builder receives visual state as drag moves over target', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      final detailsLog = <DndDroppableDetails>[];
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: Stack(
+            textDirection: TextDirection.ltr,
+            children: <Widget>[
+              Positioned(
+                left: 100,
+                top: 100,
+                child: DndDroppable(
+                  id: const DndId('column-1'),
+                  builder: (context, details, child) {
+                    detailsLog.add(details);
+                    return Text(
+                      'droppable:${details.isOver}:'
+                      '${details.activeId?.value ?? 'none'}:'
+                      '${details.session?.activeId.value ?? 'none'}',
+                      textDirection: TextDirection.ltr,
+                    );
+                  },
+                  child: const SizedBox(width: 80, height: 80),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('droppable:false:none:none'), findsOneWidget);
+      expect(detailsLog.last.id, const DndId('column-1'));
+
+      controller.beginDrag(
+        const DndSensorActivationEvent(
+          activeId: DndId('task-1'),
+          position: DndPoint.zero,
+        ),
+        activeRect: const DndRect(left: 0, top: 0, width: 20, height: 20),
+      );
+      controller.startDrag();
+      controller.moveDrag(const DndPoint(110, 110));
+      await tester.pump();
+
+      expect(find.text('droppable:true:task-1:task-1'), findsOneWidget);
+      expect(detailsLog.last.isOver, isTrue);
+
+      controller.endDrag();
+      await tester.pump();
+
+      expect(find.text('droppable:true:task-1:task-1'), findsOneWidget);
+
+      controller.reset();
+      await tester.pump();
+
+      expect(find.text('droppable:false:none:none'), findsOneWidget);
+    });
+
+    testWidgets('builder reports disabled visual state', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDroppableDetails? latestDetails;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDroppable(
+            id: const DndId('column-1'),
+            disabled: true,
+            builder: (context, details, child) {
+              latestDetails = details;
+              return child;
+            },
+            child: const SizedBox(width: 80, height: 80),
+          ),
+        ),
+      );
+
+      expect(latestDetails?.disabled, isTrue);
+      expect(latestDetails?.isOver, isFalse);
+    });
+
     testWidgets('measures global droppable bounds while mounted', (tester) async {
       final controller = DndController();
       addTearDown(controller.dispose);

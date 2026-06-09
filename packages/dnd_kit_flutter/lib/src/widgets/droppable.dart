@@ -5,6 +5,40 @@ import '../measuring/measuring.dart';
 import '../scope/controller.dart';
 import '../scope/scope.dart';
 
+/// Builds a droppable visual from the current drag state.
+typedef DndDroppableBuilder = Widget Function(
+  BuildContext context,
+  DndDroppableDetails details,
+  Widget child,
+);
+
+/// State exposed to a [DndDroppableBuilder].
+final class DndDroppableDetails {
+  /// Creates droppable visual state details.
+  const DndDroppableDetails({
+    required this.id,
+    required this.disabled,
+    required this.isOver,
+    required this.activeId,
+    required this.session,
+  });
+
+  /// The stable droppable id.
+  final DndId id;
+
+  /// Whether this droppable is ignored by drag/drop runtimes.
+  final bool disabled;
+
+  /// Whether this droppable is the current collision target.
+  final bool isOver;
+
+  /// The active draggable id, when a drag is pending, active, dropping, or cancelled.
+  final DndId? activeId;
+
+  /// The active session when a drag is moving or dropping.
+  final DndDragSession? session;
+}
+
 /// Registers a child as a droppable target in the nearest drag-and-drop scope.
 class DndDroppable extends StatefulWidget {
   /// Creates a droppable widget.
@@ -12,6 +46,7 @@ class DndDroppable extends StatefulWidget {
     super.key,
     required this.id,
     required this.child,
+    this.builder,
     this.disabled = false,
     this.data,
   });
@@ -21,6 +56,9 @@ class DndDroppable extends StatefulWidget {
 
   /// The widget users can drop over.
   final Widget child;
+
+  /// Optional visual builder for drag-over state-aware rendering.
+  final DndDroppableBuilder? builder;
 
   /// Whether this droppable should be ignored by drag/drop runtimes.
   final bool disabled;
@@ -145,13 +183,43 @@ class _DndDroppableState extends State<DndDroppable> {
     });
   }
 
+  DndDroppableDetails _detailsFor(DndController controller) {
+    return DndDroppableDetails(
+      id: widget.id,
+      disabled: widget.disabled,
+      isOver: controller.overId == widget.id,
+      activeId: controller.activeId,
+      session: controller.activeSession,
+    );
+  }
+
+  Widget _buildVisual(BuildContext context, Widget child) {
+    final builder = widget.builder;
+    final controller = _controller;
+    if (builder == null || controller == null) {
+      return child;
+    }
+
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, child) {
+        return builder(
+          context,
+          _detailsFor(controller),
+          child!,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _scheduleMeasure();
     return DndMeasuredBox(
       key: _measureKey,
       onLayout: _markMeasurementDirty,
-      child: widget.child,
+      child: _buildVisual(context, widget.child),
     );
   }
 }

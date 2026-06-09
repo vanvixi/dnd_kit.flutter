@@ -200,6 +200,83 @@ void main() {
       );
     });
 
+    testWidgets('builder receives visual state as drag lifecycle changes', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      final detailsLog = <DndDraggableDetails>[];
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            builder: (context, details, child) {
+              detailsLog.add(details);
+              return Text(
+                'draggable:${details.isActive}:${details.isDragging}:'
+                '${details.isDropping}:${details.session?.activeId.value ?? 'none'}',
+                textDirection: TextDirection.ltr,
+              );
+            },
+            child: const SizedBox(width: 40, height: 40),
+          ),
+        ),
+      );
+
+      expect(find.text('draggable:false:false:false:none'), findsOneWidget);
+      expect(detailsLog.last.id, const DndId('task-1'));
+
+      controller.beginDrag(
+        const DndSensorActivationEvent(
+          activeId: DndId('task-1'),
+          position: DndPoint(10, 10),
+        ),
+        activeRect: const DndRect(left: 0, top: 0, width: 40, height: 40),
+      );
+      await tester.pump();
+
+      expect(find.text('draggable:true:false:false:none'), findsOneWidget);
+
+      controller.startDrag();
+      await tester.pump();
+
+      expect(find.text('draggable:true:true:false:task-1'), findsOneWidget);
+
+      controller.endDrag();
+      await tester.pump();
+
+      expect(find.text('draggable:true:false:true:task-1'), findsOneWidget);
+
+      controller.reset();
+      await tester.pump();
+
+      expect(find.text('draggable:false:false:false:none'), findsOneWidget);
+    });
+
+    testWidgets('builder reports disabled visual state', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDraggableDetails? latestDetails;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            disabled: true,
+            builder: (context, details, child) {
+              latestDetails = details;
+              return child;
+            },
+            child: const SizedBox(width: 40, height: 40),
+          ),
+        ),
+      );
+
+      expect(latestDetails?.disabled, isTrue);
+      expect(latestDetails?.isActive, isFalse);
+    });
+
     testWidgets('emits core drag lifecycle callbacks for pan gestures', (tester) async {
       final controller = DndController();
       addTearDown(controller.dispose);

@@ -12,6 +12,44 @@ import '../scope/scope.dart';
 import '../sensors/long_press_activation.dart';
 import '../sensors/pointer_sensor.dart';
 
+/// Builds a draggable visual from the current drag state.
+typedef DndDraggableBuilder = Widget Function(
+  BuildContext context,
+  DndDraggableDetails details,
+  Widget child,
+);
+
+/// State exposed to a [DndDraggableBuilder].
+final class DndDraggableDetails {
+  /// Creates draggable visual state details.
+  const DndDraggableDetails({
+    required this.id,
+    required this.disabled,
+    required this.isActive,
+    required this.isDragging,
+    required this.isDropping,
+    required this.session,
+  });
+
+  /// The stable draggable id.
+  final DndId id;
+
+  /// Whether drag gestures are ignored for this draggable.
+  final bool disabled;
+
+  /// Whether this draggable is the active drag source.
+  final bool isActive;
+
+  /// Whether this draggable is actively dragging.
+  final bool isDragging;
+
+  /// Whether this draggable is completing a drop.
+  final bool isDropping;
+
+  /// The active session for this draggable, when available.
+  final DndDragSession? session;
+}
+
 /// Registers a child as draggable and wires basic pointer gestures to a scope.
 class DndDraggable extends StatefulWidget {
   /// Creates a draggable widget.
@@ -19,6 +57,7 @@ class DndDraggable extends StatefulWidget {
     super.key,
     required this.id,
     required this.child,
+    this.builder,
     this.disabled = false,
     this.data,
     this.activationConstraint = DndSensorActivationConstraint.none,
@@ -40,6 +79,9 @@ class DndDraggable extends StatefulWidget {
 
   /// The widget users can drag.
   final Widget child;
+
+  /// Optional visual builder for drag state-aware rendering.
+  final DndDraggableBuilder? builder;
 
   /// Whether drag gestures should be ignored for this draggable.
   final bool disabled;
@@ -349,6 +391,45 @@ class _DndDraggableState extends State<DndDraggable> implements DndDraggableHand
     );
   }
 
+  DndDraggableDetails _detailsFor(DndController controller) {
+    final state = controller.state;
+    final session = switch (state) {
+      DndDragging(:final session) ||
+      DndDropping(:final session) when session.activeId == widget.id =>
+        session,
+      _ => null,
+    };
+
+    return DndDraggableDetails(
+      id: widget.id,
+      disabled: widget.disabled,
+      isActive: controller.activeId == widget.id,
+      isDragging: state is DndDragging && state.session.activeId == widget.id,
+      isDropping: state is DndDropping && state.session.activeId == widget.id,
+      session: session,
+    );
+  }
+
+  Widget _buildVisual(BuildContext context, Widget child) {
+    final builder = widget.builder;
+    final controller = _controller;
+    if (builder == null || controller == null) {
+      return child;
+    }
+
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, child) {
+        return builder(
+          context,
+          _detailsFor(controller),
+          child!,
+        );
+      },
+    );
+  }
+
   void _handleDragStart(DndDragStartEvent event) {
     if (widget.longPressActivation?.hapticFeedback == true) {
       unawaited(HapticFeedback.selectionClick());
@@ -544,7 +625,7 @@ class _DndDraggableState extends State<DndDraggable> implements DndDraggableHand
                 onPanUpdate: widget.disabled || _usesLongPressActivation ? null : _handlePanUpdate,
                 onPanEnd: widget.disabled || _usesLongPressActivation ? null : _handlePanEnd,
                 onPanCancel: widget.disabled || _usesLongPressActivation ? null : _handlePanCancel,
-                child: widget.child,
+                child: _buildVisual(context, widget.child),
               ),
             ),
           ),
