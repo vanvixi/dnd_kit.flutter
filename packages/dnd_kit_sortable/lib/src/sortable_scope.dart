@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'sortable_details.dart';
+import 'sortable_strategy.dart';
 
 /// Provides sortable order and drag controller state to a subtree.
 class SortableScope extends StatelessWidget {
@@ -12,6 +13,7 @@ class SortableScope extends StatelessWidget {
     super.key,
     this.controller,
     this.containerId,
+    this.strategy = SortableStrategies.verticalList,
     required Iterable<DndId> itemIds,
     this.onMove,
     required this.child,
@@ -25,6 +27,9 @@ class SortableScope extends StatelessWidget {
 
   /// Optional sortable container id for future multi-container APIs.
   final DndId? containerId;
+
+  /// Computes reorder intent from the drag end event and measured item layout.
+  final SortableStrategy strategy;
 
   /// The application-owned item order.
   final List<DndId> itemIds;
@@ -65,6 +70,7 @@ class SortableScope extends StatelessWidget {
       child: _SortableScope(
         data: SortableScopeData(
           containerId: containerId,
+          strategy: strategy,
           itemIds: itemIds,
           onMove: onMove,
         ),
@@ -80,12 +86,16 @@ final class SortableScopeData {
   /// Creates sortable scope data.
   SortableScopeData({
     required Iterable<DndId> itemIds,
+    this.strategy = SortableStrategies.verticalList,
     this.containerId,
     this.onMove,
   }) : itemIds = List<DndId>.unmodifiable(itemIds);
 
   /// Optional sortable container id for future multi-container APIs.
   final DndId? containerId;
+
+  /// Computes reorder intent from the drag end event and measured item layout.
+  final SortableStrategy strategy;
 
   /// The application-owned item order.
   final List<DndId> itemIds;
@@ -97,7 +107,11 @@ final class SortableScopeData {
   int indexOf(DndId id) => itemIds.indexOf(id);
 
   /// Builds move intent details for [event], when the drop is a same-scope move.
-  SortableMoveDetails? moveDetailsFor(DndDragEndEvent event) {
+  SortableMoveDetails? moveDetailsFor(
+    DndDragEndEvent event, {
+    Map<DndId, DndRect> itemRects = const <DndId, DndRect>{},
+    DndRect? activeRect,
+  }) {
     final overId = event.overId;
     if (overId == null || overId == event.activeId) {
       return null;
@@ -109,13 +123,18 @@ final class SortableScopeData {
       return null;
     }
 
-    return SortableMoveDetails(
-      activeId: event.activeId,
-      overId: overId,
-      oldIndex: oldIndex,
-      newIndex: newIndex,
-      containerId: containerId,
-      event: event,
+    return strategy(
+      SortableStrategyInput(
+        activeId: event.activeId,
+        overId: overId,
+        itemIds: itemIds,
+        itemRects: itemRects,
+        oldIndex: oldIndex,
+        containerId: containerId,
+        event: event,
+        activeRect: activeRect,
+        activeTranslatedRect: activeRect?.translate(event.session.transform.offset),
+      ),
     );
   }
 
@@ -124,11 +143,17 @@ final class SortableScopeData {
     return other is SortableScopeData &&
         listEquals(other.itemIds, itemIds) &&
         other.containerId == containerId &&
+        other.strategy == strategy &&
         other.onMove == onMove;
   }
 
   @override
-  int get hashCode => Object.hash(Object.hashAll(itemIds), containerId, onMove);
+  int get hashCode => Object.hash(
+        Object.hashAll(itemIds),
+        containerId,
+        strategy,
+        onMove,
+      );
 
   @override
   String toString() {

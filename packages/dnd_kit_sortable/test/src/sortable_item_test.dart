@@ -197,6 +197,61 @@ void main() {
       );
     });
 
+    testWidgets('uses the configured sortable strategy for move intent', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      SortableStrategyInput? latestInput;
+      final moves = <SortableMoveDetails>[];
+
+      await tester.pumpWidget(
+        SortableScope(
+          controller: controller,
+          itemIds: const <DndId>[DndId('item-1'), DndId('item-2')],
+          strategy: (input) {
+            latestInput = input;
+            return input.fallbackMoveDetails(newIndex: 0);
+          },
+          onMove: moves.add,
+          child: const Stack(
+            textDirection: TextDirection.ltr,
+            children: <Widget>[
+              Positioned(
+                left: 0,
+                top: 0,
+                child: SortableItem(
+                  id: DndId('item-1'),
+                  child: SizedBox(width: 80, height: 80),
+                ),
+              ),
+              Positioned(
+                left: 100,
+                top: 0,
+                child: SortableItem(
+                  id: DndId('item-2'),
+                  child: SizedBox(width: 80, height: 80),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.dragFrom(const Offset(40, 40), const Offset(100, 0));
+      await tester.pump();
+
+      expect(latestInput?.activeId, const DndId('item-1'));
+      expect(latestInput?.overId, const DndId('item-2'));
+      expect(latestInput?.itemRects.keys, contains(const DndId('item-2')));
+      expect(latestInput?.activeRect, isNotNull);
+      expect(
+        moves.single,
+        isA<SortableMoveDetails>()
+            .having((details) => details.oldIndex, 'oldIndex', 0)
+            .having((details) => details.newIndex, 'newIndex', 0),
+      );
+    });
+
     testWidgets('does not report a move when dropped over itself', (tester) async {
       final controller = DndController();
       addTearDown(controller.dispose);

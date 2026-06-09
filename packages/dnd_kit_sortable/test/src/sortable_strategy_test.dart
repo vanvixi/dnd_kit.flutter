@@ -1,0 +1,167 @@
+import 'package:dnd_kit_core/dnd_kit_core.dart';
+import 'package:dnd_kit_sortable/dnd_kit_sortable.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('SortableStrategies.verticalList', () {
+    test('computes new index from the active translated center', () {
+      final details = SortableStrategies.verticalList(
+        _input(
+          activeId: const DndId('item-1'),
+          overId: const DndId('item-3'),
+          oldIndex: 0,
+          activeTranslatedRect: _rect(top: 126),
+          itemRects: <DndId, DndRect>{
+            const DndId('item-1'): _rect(top: 0),
+            const DndId('item-2'): _rect(top: 60),
+            const DndId('item-3'): _rect(top: 120),
+          },
+        ),
+      );
+
+      expect(details?.activeId, const DndId('item-1'));
+      expect(details?.overId, const DndId('item-3'));
+      expect(details?.oldIndex, 0);
+      expect(details?.newIndex, 2);
+    });
+
+    test('supports moving upward before earlier measured items', () {
+      final details = SortableStrategies.verticalList(
+        _input(
+          activeId: const DndId('item-3'),
+          overId: const DndId('item-1'),
+          oldIndex: 2,
+          activeTranslatedRect: _rect(top: -20),
+          itemRects: <DndId, DndRect>{
+            const DndId('item-1'): _rect(top: 0),
+            const DndId('item-2'): _rect(top: 60),
+            const DndId('item-3'): _rect(top: 120),
+          },
+        ),
+      );
+
+      expect(details?.oldIndex, 2);
+      expect(details?.newIndex, 0);
+    });
+
+    test('uses measured centers for a two item vertical list', () {
+      final details = SortableStrategies.verticalList(
+        _input(
+          activeId: const DndId('item-1'),
+          overId: const DndId('item-2'),
+          oldIndex: 0,
+          itemIds: const <DndId>[DndId('item-1'), DndId('item-2')],
+          activeTranslatedRect: _rect(top: 80),
+          itemRects: <DndId, DndRect>{
+            const DndId('item-1'): _rect(top: 0),
+            const DndId('item-2'): _rect(top: 60),
+          },
+        ),
+      );
+
+      expect(details?.newIndex, 1);
+    });
+
+    test('falls back to drop-over index when measurements are incomplete', () {
+      final details = SortableStrategies.verticalList(
+        _input(
+          activeId: const DndId('item-1'),
+          overId: const DndId('item-3'),
+          oldIndex: 0,
+          activeTranslatedRect: _rect(top: 126),
+          itemRects: <DndId, DndRect>{
+            const DndId('item-1'): _rect(top: 0),
+            const DndId('item-2'): _rect(top: 60),
+          },
+        ),
+      );
+
+      expect(details?.newIndex, 2);
+    });
+
+    test('falls back to drop-over index for non-vertical layouts', () {
+      final details = SortableStrategies.verticalList(
+        _input(
+          activeId: const DndId('item-1'),
+          overId: const DndId('item-2'),
+          oldIndex: 0,
+          activeTranslatedRect: _rect(top: 0, left: 100),
+          itemRects: <DndId, DndRect>{
+            const DndId('item-1'): _rect(top: 0, left: 0),
+            const DndId('item-2'): _rect(top: 0, left: 100),
+            const DndId('item-3'): _rect(top: 0, left: 200),
+          },
+        ),
+      );
+
+      expect(details?.newIndex, 1);
+    });
+
+    test('does not report same-item moves or mutate item order', () {
+      final itemIds = <DndId>[
+        const DndId('item-1'),
+        const DndId('item-2'),
+        const DndId('item-3'),
+      ];
+
+      final details = SortableStrategies.verticalList(
+        _input(
+          activeId: const DndId('item-1'),
+          overId: const DndId('item-1'),
+          oldIndex: 0,
+          itemIds: itemIds,
+          activeTranslatedRect: _rect(top: 60),
+          itemRects: <DndId, DndRect>{
+            const DndId('item-1'): _rect(top: 0),
+            const DndId('item-2'): _rect(top: 60),
+            const DndId('item-3'): _rect(top: 120),
+          },
+        ),
+      );
+
+      expect(details, isNull);
+      expect(
+        itemIds,
+        const <DndId>[DndId('item-1'), DndId('item-2'), DndId('item-3')],
+      );
+    });
+  });
+}
+
+SortableStrategyInput _input({
+  required DndId activeId,
+  required DndId? overId,
+  required int oldIndex,
+  required Map<DndId, DndRect> itemRects,
+  required DndRect activeTranslatedRect,
+  Iterable<DndId> itemIds = const <DndId>[
+    DndId('item-1'),
+    DndId('item-2'),
+    DndId('item-3'),
+  ],
+}) {
+  return SortableStrategyInput(
+    activeId: activeId,
+    overId: overId,
+    itemIds: itemIds,
+    itemRects: itemRects,
+    oldIndex: oldIndex,
+    containerId: const DndId('list-1'),
+    event: DndDragEndEvent(
+      session: DndDragSession.start(
+        activeId: activeId,
+        initialPointer: DndPoint.zero,
+      ),
+      overId: overId,
+    ),
+    activeRect: itemRects[activeId],
+    activeTranslatedRect: activeTranslatedRect,
+  );
+}
+
+DndRect _rect({
+  required double top,
+  double left = 0,
+}) {
+  return DndRect(left: left, top: top, width: 50, height: 50);
+}

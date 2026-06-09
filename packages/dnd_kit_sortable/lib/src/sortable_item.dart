@@ -97,8 +97,16 @@ class SortableItem extends StatelessWidget {
   /// How this sortable item participates in hit testing.
   final HitTestBehavior? hitTestBehavior;
 
-  void _handleDragEnd(SortableScopeData scope, DndDragEndEvent event) {
-    final details = scope.moveDetailsFor(event);
+  void _handleDragEnd(
+    SortableScopeData scope,
+    DndController controller,
+    DndDragEndEvent event,
+  ) {
+    final details = scope.moveDetailsFor(
+      event,
+      itemRects: controller.measuring.droppableRects,
+      activeRect: controller.activeRect,
+    );
     if (details != null) {
       scope.onMove?.call(details);
     }
@@ -139,7 +147,7 @@ class SortableItem extends StatelessWidget {
         longPressActivation: longPressActivation,
         keyboardDragStep: keyboardDragStep,
         hitTestBehavior: hitTestBehavior,
-        onDragEnd: (event) => _handleDragEnd(scope, event),
+        onDragEnd: (event) => _handleDragEnd(scope, controller, event),
         builder: builder == null
             ? null
             : (context, draggableDetails, child) {
