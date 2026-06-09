@@ -1,5 +1,6 @@
 import 'package:dnd_kit_core/dnd_kit_core.dart';
 import 'package:flutter/widgets.dart';
+import 'package:meta/meta.dart';
 
 import 'controller.dart';
 import 'measuring.dart';
@@ -57,13 +58,15 @@ class DndDraggable extends StatefulWidget {
   State<DndDraggable> createState() => _DndDraggableState();
 }
 
-class _DndDraggableState extends State<DndDraggable> {
+class _DndDraggableState extends State<DndDraggable> implements DndDraggableHandleController {
   final GlobalKey _measureKey = GlobalKey();
   DndController? _controller;
   DndController? _registeredController;
   DndDraggableRegistration? _registration;
   DndPointerSensor? _pointerSensor;
   bool _disabledCancelScheduled = false;
+  bool _handlePointerActive = false;
+  int _handleCount = 0;
 
   @override
   void didChangeDependencies() {
@@ -134,7 +137,41 @@ class _DndDraggableState extends State<DndDraggable> {
     _registration = null;
   }
 
-  void _handlePanStart(DragStartDetails details) {
+  @internal
+  @override
+  void registerHandle() {
+    _handleCount += 1;
+  }
+
+  @internal
+  @override
+  void unregisterHandle() {
+    assert(_handleCount > 0, 'Cannot unregister a drag handle before registration.');
+    if (_handleCount == 0) {
+      return;
+    }
+
+    _handleCount -= 1;
+  }
+
+  @internal
+  @override
+  void markHandlePointerActive() {
+    _handlePointerActive = true;
+  }
+
+  @internal
+  @override
+  void clearHandlePointerActive() {
+    _handlePointerActive = false;
+  }
+
+  void _handlePanStart(DragStartDetails details, {required bool fromHandle}) {
+    final startedFromHandle = fromHandle || _handlePointerActive;
+    if (_handleCount > 0 && !startedFromHandle) {
+      return;
+    }
+
     if (widget.disabled) {
       return;
     }
@@ -179,6 +216,7 @@ class _DndDraggableState extends State<DndDraggable> {
   void _handlePanEnd(DragEndDetails details) {
     _pointerSensor?.end();
     _pointerSensor = null;
+    _handlePointerActive = false;
   }
 
   void _handlePanCancel() {
@@ -187,11 +225,13 @@ class _DndDraggableState extends State<DndDraggable> {
     }
 
     _cancelDrag(reason: DndCancelReason.sensor);
+    _handlePointerActive = false;
   }
 
   void _cancelDrag({required DndCancelReason reason}) {
     _pointerSensor?.cancel(reason: reason);
     _pointerSensor = null;
+    _handlePointerActive = false;
   }
 
   void _scheduleDisabledCancel() {
@@ -212,16 +252,54 @@ class _DndDraggableState extends State<DndDraggable> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      key: _measureKey,
-      behavior: widget.hitTestBehavior ?? HitTestBehavior.opaque,
-      onPanStart: widget.disabled ? null : _handlePanStart,
-      onPanUpdate: widget.disabled ? null : _handlePanUpdate,
-      onPanEnd: widget.disabled ? null : _handlePanEnd,
-      onPanCancel: widget.disabled ? null : _handlePanCancel,
-      child: widget.child,
+    return DndDraggableHandleScope(
+      draggable: this,
+      child: GestureDetector(
+        key: _measureKey,
+        behavior: widget.hitTestBehavior ?? HitTestBehavior.opaque,
+        onPanStart: widget.disabled
+            ? null
+            : (details) {
+                _handlePanStart(details, fromHandle: false);
+              },
+        onPanUpdate: widget.disabled ? null : _handlePanUpdate,
+        onPanEnd: widget.disabled ? null : _handlePanEnd,
+        onPanCancel: widget.disabled ? null : _handlePanCancel,
+        child: widget.child,
+      ),
     );
   }
+}
+
+@internal
+class DndDraggableHandleScope extends InheritedWidget {
+  const DndDraggableHandleScope({
+    super.key,
+    required this.draggable,
+    required super.child,
+  });
+
+  final DndDraggableHandleController draggable;
+
+  static DndDraggableHandleScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<DndDraggableHandleScope>();
+  }
+
+  @override
+  bool updateShouldNotify(DndDraggableHandleScope oldWidget) {
+    return draggable != oldWidget.draggable;
+  }
+}
+
+@internal
+abstract interface class DndDraggableHandleController {
+  void registerHandle();
+
+  void unregisterHandle();
+
+  void markHandlePointerActive();
+
+  void clearHandlePointerActive();
 }
 
 DndPoint _pointFromOffset(Offset offset) {

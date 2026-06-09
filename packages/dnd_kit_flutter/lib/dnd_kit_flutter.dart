@@ -3,7 +3,8 @@
 library;
 
 export 'src/controller.dart';
-export 'src/draggable.dart';
+export 'src/drag_handle.dart';
+export 'src/draggable.dart' hide DndDraggableHandleController, DndDraggableHandleScope;
 export 'src/droppable.dart';
 export 'src/measuring.dart';
 export 'src/pointer_sensor.dart';

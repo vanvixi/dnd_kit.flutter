@@ -323,6 +323,187 @@ void main() {
       await gesture.cancel();
     });
 
+    testWidgets('starts a drag from a drag handle', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDragStartEvent? startEvent;
+      DndDragEndEvent? endEvent;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            onDragStart: (event) {
+              startEvent = event;
+            },
+            onDragEnd: (event) {
+              endEvent = event;
+            },
+            child: const SizedBox(
+              width: 100,
+              height: 100,
+              child: Stack(
+                textDirection: TextDirection.ltr,
+                children: <Widget>[
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: DndDragHandle(
+                      child: SizedBox(width: 30, height: 30),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.dragFrom(const Offset(10, 10), const Offset(20, 0));
+      await tester.pump();
+
+      expect(startEvent?.activeId, const DndId('task-1'));
+      expect(startEvent?.initialPointer, const DndPoint(10, 10));
+      expect(endEvent?.activeId, const DndId('task-1'));
+      expect(controller.state, const DndIdle());
+    });
+
+    testWidgets('does not start from the draggable body when a handle exists', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      var startCount = 0;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            onDragStart: (_) {
+              startCount += 1;
+            },
+            child: const SizedBox(
+              width: 100,
+              height: 100,
+              child: Stack(
+                textDirection: TextDirection.ltr,
+                children: <Widget>[
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: DndDragHandle(
+                      child: SizedBox(width: 30, height: 30),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.dragFrom(const Offset(80, 80), const Offset(20, 0));
+      await tester.pump();
+
+      expect(startCount, 0);
+      expect(controller.state, const DndIdle());
+    });
+
+    testWidgets('applies pointer activation constraints through a drag handle', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDragStartEvent? startEvent;
+      final moveEvents = <DndDragMoveEvent>[];
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            activationConstraint: const DndSensorActivationConstraint(distance: 50),
+            onDragStart: (event) {
+              startEvent = event;
+            },
+            onDragMove: moveEvents.add,
+            child: const SizedBox(
+              width: 120,
+              height: 120,
+              child: Stack(
+                textDirection: TextDirection.ltr,
+                children: <Widget>[
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: DndDragHandle(
+                      child: SizedBox(width: 40, height: 40),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await gesture.moveBy(const Offset(20, 0));
+      await tester.pump();
+
+      expect(startEvent, isNull);
+      expect(controller.state, isA<DndPending>());
+
+      await gesture.moveBy(const Offset(80, 0));
+      await tester.pump();
+
+      expect(startEvent?.activeId, const DndId('task-1'));
+      expect(moveEvents, isNotEmpty);
+      expect(controller.state, isA<DndDragging>());
+
+      await gesture.up();
+      await tester.pump();
+    });
+
+    testWidgets('does not start from a handle when the draggable is disabled', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      var startCount = 0;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            disabled: true,
+            onDragStart: (_) {
+              startCount += 1;
+            },
+            child: const SizedBox(
+              width: 100,
+              height: 100,
+              child: Stack(
+                textDirection: TextDirection.ltr,
+                children: <Widget>[
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: DndDragHandle(
+                      child: SizedBox(width: 30, height: 30),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.dragFrom(const Offset(10, 10), const Offset(20, 0));
+      await tester.pump();
+
+      expect(startCount, 0);
+      expect(controller.state, const DndIdle());
+    });
+
     testWidgets('cancels an active drag when disabled during the gesture', (tester) async {
       final controller = DndController();
       addTearDown(controller.dispose);
