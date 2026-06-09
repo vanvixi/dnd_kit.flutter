@@ -817,6 +817,64 @@ void main() {
       expect(endEvent?.overId, const DndId('column-1'));
     });
 
+    testWidgets('applies controller modifiers during pointer dragging', (tester) async {
+      final controller = DndController(
+        modifiers: const <DndModifier>[
+          DndModifiers.restrictToHorizontalAxis,
+        ],
+      );
+      addTearDown(controller.dispose);
+      final moveEvents = <DndDragMoveEvent>[];
+      DndDragEndEvent? endEvent;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: Stack(
+            textDirection: TextDirection.ltr,
+            children: <Widget>[
+              const Positioned(
+                left: 100,
+                top: 0,
+                child: DndDroppable(
+                  id: DndId('column-1'),
+                  child: SizedBox(width: 80, height: 80),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: 0,
+                child: DndDraggable(
+                  id: const DndId('task-1'),
+                  onDragMove: moveEvents.add,
+                  onDragEnd: (event) {
+                    endEvent = event;
+                  },
+                  child: const SizedBox(width: 40, height: 40),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await tester.pump();
+      await gesture.moveBy(const Offset(100, 100));
+      await tester.pump();
+
+      expect(moveEvents.single.currentPointer, const DndPoint(120, 20));
+      expect(moveEvents.single.delta, const DndPoint(100, 0));
+      expect(controller.overId, const DndId('column-1'));
+
+      await gesture.up();
+      await tester.pump();
+
+      expect(endEvent?.currentPointer, const DndPoint(120, 20));
+      expect(endEvent?.overId, const DndId('column-1'));
+    });
+
     testWidgets('ignores disabled droppables during collision detection', (tester) async {
       final controller = DndController();
       addTearDown(controller.dispose);
@@ -908,6 +966,50 @@ void main() {
 
       expect(endEvent?.activeId, const DndId('task-1'));
       expect(endEvent?.currentPointer, const DndPoint(410, 310));
+      expect(controller.state, const DndIdle());
+    });
+
+    testWidgets('applies controller modifiers during keyboard dragging', (tester) async {
+      final controller = DndController(
+        modifiers: const <DndModifier>[
+          DndModifiers.restrictToVerticalAxis,
+        ],
+      );
+      addTearDown(controller.dispose);
+      final moveEvents = <DndDragMoveEvent>[];
+      DndDragEndEvent? endEvent;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            keyboardDragStep: 10,
+            onDragMove: moveEvents.add,
+            onDragEnd: (event) {
+              endEvent = event;
+            },
+            child: const SizedBox(width: 40, height: 40),
+          ),
+        ),
+      );
+
+      await focusDraggable(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+
+      expect(moveEvents.map((event) => event.currentPointer), <DndPoint>[
+        const DndPoint(400, 300),
+        const DndPoint(400, 310),
+      ]);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(endEvent?.currentPointer, const DndPoint(400, 310));
       expect(controller.state, const DndIdle());
     });
 

@@ -83,5 +83,36 @@ void main() {
       expect(activeCancel?.reason, DndCancelReason.disabled);
       expect(controller.state, isA<DndCancelled>());
     });
+
+    test('applies modifiers to drag movement and collision detection', () {
+      final controller = DndController(
+        modifiers: const <DndModifier>[
+          DndModifiers.restrictToHorizontalAxis,
+        ],
+      );
+      addTearDown(controller.dispose);
+
+      controller.registry.registerDroppable(const DndDroppableRegistration(id: DndId('column-1')));
+      controller.measuring.updateDroppableRect(
+        const DndId('column-1'),
+        const DndRect(left: 100, top: 0, width: 80, height: 80),
+      );
+
+      controller.beginDrag(
+        const DndSensorActivationEvent(
+          activeId: DndId('task-1'),
+          position: DndPoint(20, 20),
+        ),
+        activeRect: const DndRect(left: 0, top: 0, width: 40, height: 40),
+      );
+      controller.startDrag();
+
+      final moveEvent = controller.moveDrag(const DndPoint(120, 120));
+
+      expect(moveEvent?.currentPointer, const DndPoint(120, 20));
+      expect(moveEvent?.delta, const DndPoint(100, 0));
+      expect(controller.activeSession?.transform, const DndTransform(x: 100));
+      expect(controller.overId, const DndId('column-1'));
+    });
   });
 }

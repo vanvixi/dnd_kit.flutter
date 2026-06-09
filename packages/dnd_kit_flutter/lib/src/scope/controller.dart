@@ -9,7 +9,9 @@ class DndController extends ChangeNotifier {
   DndController({
     DndState initialState = const DndIdle(),
     DndCollisionDetector? collisionDetector,
+    Iterable<DndModifier> modifiers = const <DndModifier>[],
   })  : _state = initialState,
+        modifiers = List<DndModifier>.unmodifiable(modifiers),
         collisionDetector = collisionDetector ??
             DndCollisionDetectors.compose(
               const <DndCollisionDetector>[
@@ -30,6 +32,9 @@ class DndController extends ChangeNotifier {
 
   /// The detector used to rank measured droppable collision candidates.
   final DndCollisionDetector collisionDetector;
+
+  /// The modifiers applied to active drag movement before collision detection.
+  final List<DndModifier> modifiers;
 
   /// The current drag lifecycle state.
   DndState get state => _state;
@@ -95,7 +100,7 @@ class DndController extends ChangeNotifier {
       return null;
     }
 
-    final next = DndDragging(session: current.session.moveTo(position));
+    final next = DndDragging(session: _modifiedSession(current.session, position));
     _replaceState(next);
     _updateCollision(next.session);
     return DndDragMoveEvent(session: next.session);
@@ -180,12 +185,38 @@ class DndController extends ChangeNotifier {
 
     final result = collisionDetector(
       DndCollisionInput(
-        activeRect: activeRect.translate(session.delta),
+        activeRect: activeRect.translate(session.transform.offset),
         droppableRects: droppableRects,
         pointer: session.currentPointer,
       ),
     );
     _setOverId(result.firstOrNull?.id);
+  }
+
+  DndDragSession _modifiedSession(DndDragSession session, DndPoint rawPosition) {
+    if (modifiers.isEmpty) {
+      return session.moveTo(rawPosition);
+    }
+
+    final activeRect = _activeRect;
+    if (activeRect == null) {
+      return session.moveTo(rawPosition);
+    }
+
+    final rawTransform = DndTransform(
+      x: rawPosition.x - session.initialPointer.x,
+      y: rawPosition.y - session.initialPointer.y,
+    );
+    final modifiedTransform = DndModifiers.compose(modifiers)(
+      DndModifierInput(
+        transform: rawTransform,
+        activeRect: activeRect,
+        droppableRects: measuring.droppableRects,
+        pointer: rawPosition,
+      ),
+    );
+
+    return session.moveTo(session.initialPointer.translate(modifiedTransform.offset));
   }
 
   void _setOverId(DndId? next) {
