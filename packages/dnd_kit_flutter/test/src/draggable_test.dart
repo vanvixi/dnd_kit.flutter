@@ -323,6 +323,117 @@ void main() {
       await gesture.cancel();
     });
 
+    testWidgets('starts a long-press drag after the configured delay', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDragStartEvent? startEvent;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            longPressActivation: const DndLongPressActivation(
+              delay: Duration(milliseconds: 300),
+            ),
+            onDragStart: (event) {
+              startEvent = event;
+            },
+            child: const SizedBox(width: 120, height: 120),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await tester.pump(const Duration(milliseconds: 299));
+
+      expect(startEvent, isNull);
+      expect(controller.state, isA<DndPending>());
+
+      await tester.pump(const Duration(milliseconds: 1));
+
+      expect(startEvent?.activeId, const DndId('task-1'));
+      expect(startEvent?.initialPointer, const DndPoint(20, 20));
+      expect(controller.state, isA<DndDragging>());
+
+      await gesture.up();
+      await tester.pump();
+    });
+
+    testWidgets('cancels long-press activation when tolerance is exceeded', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDragStartEvent? startEvent;
+      DndDragCancelEvent? cancelEvent;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            longPressActivation: const DndLongPressActivation(
+              delay: Duration(seconds: 1),
+              tolerance: 5,
+            ),
+            onDragStart: (event) {
+              startEvent = event;
+            },
+            onDragCancel: (event) {
+              cancelEvent = event;
+            },
+            child: const SizedBox(width: 120, height: 120),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await gesture.moveBy(const Offset(20, 0));
+      await tester.pump();
+
+      expect(startEvent, isNull);
+      expect(cancelEvent?.activeId, const DndId('task-1'));
+      expect(cancelEvent?.reason, DndCancelReason.sensor);
+      expect(controller.state, const DndIdle());
+
+      await gesture.cancel();
+    });
+
+    testWidgets('cancels long-press activation when the pointer ends early', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDragStartEvent? startEvent;
+      DndDragCancelEvent? cancelEvent;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            longPressActivation: const DndLongPressActivation(
+              delay: Duration(milliseconds: 300),
+            ),
+            onDragStart: (event) {
+              startEvent = event;
+            },
+            onDragCancel: (event) {
+              cancelEvent = event;
+            },
+            child: const SizedBox(width: 120, height: 120),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pump();
+
+      expect(startEvent, isNull);
+      expect(cancelEvent?.activeId, const DndId('task-1'));
+      expect(cancelEvent?.reason, DndCancelReason.sensor);
+      expect(controller.state, const DndIdle());
+    });
+
     testWidgets('starts a drag from a drag handle', (tester) async {
       final controller = DndController();
       addTearDown(controller.dispose);
@@ -457,6 +568,57 @@ void main() {
 
       expect(startEvent?.activeId, const DndId('task-1'));
       expect(moveEvents, isNotEmpty);
+      expect(controller.state, isA<DndDragging>());
+
+      await gesture.up();
+      await tester.pump();
+    });
+
+    testWidgets('applies long-press activation through a drag handle', (tester) async {
+      final controller = DndController();
+      addTearDown(controller.dispose);
+      DndDragStartEvent? startEvent;
+
+      await tester.pumpWidget(
+        DndScope(
+          controller: controller,
+          child: DndDraggable(
+            id: const DndId('task-1'),
+            longPressActivation: const DndLongPressActivation(
+              delay: Duration(milliseconds: 300),
+            ),
+            onDragStart: (event) {
+              startEvent = event;
+            },
+            child: const SizedBox(
+              width: 120,
+              height: 120,
+              child: Stack(
+                textDirection: TextDirection.ltr,
+                children: <Widget>[
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: DndDragHandle(
+                      child: SizedBox(width: 40, height: 40),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(const Offset(20, 20));
+      await tester.pump(const Duration(milliseconds: 299));
+
+      expect(startEvent, isNull);
+      expect(controller.state, isA<DndPending>());
+
+      await tester.pump(const Duration(milliseconds: 1));
+
+      expect(startEvent?.activeId, const DndId('task-1'));
       expect(controller.state, isA<DndDragging>());
 
       await gesture.up();

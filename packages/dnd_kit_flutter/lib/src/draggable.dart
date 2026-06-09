@@ -1,8 +1,12 @@
+import 'dart:async' show unawaited;
+
 import 'package:dnd_kit_core/dnd_kit_core.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 
 import 'controller.dart';
+import 'long_press_activation.dart';
 import 'measuring.dart';
 import 'pointer_sensor.dart';
 import 'scope.dart';
@@ -17,12 +21,16 @@ class DndDraggable extends StatefulWidget {
     this.disabled = false,
     this.data,
     this.activationConstraint = DndSensorActivationConstraint.none,
+    this.longPressActivation,
     this.hitTestBehavior,
     this.onDragStart,
     this.onDragMove,
     this.onDragEnd,
     this.onDragCancel,
-  });
+  }) : assert(
+          longPressActivation == null || activationConstraint == DndSensorActivationConstraint.none,
+          'Use either activationConstraint or longPressActivation, not both.',
+        );
 
   /// The stable draggable id.
   final DndId id;
@@ -38,6 +46,9 @@ class DndDraggable extends StatefulWidget {
 
   /// The pointer activation constraint required before a drag starts.
   final DndSensorActivationConstraint activationConstraint;
+
+  /// Optional long-press activation behavior for pointer drags.
+  final DndLongPressActivation? longPressActivation;
 
   /// How this draggable participates in hit testing.
   final HitTestBehavior? hitTestBehavior;
@@ -95,6 +106,8 @@ class _DndDraggableState extends State<DndDraggable> implements DndDraggableHand
   bool get _isWidgetGestureDrag {
     return _pointerSensor?.isActive == true && _controller?.activeId == widget.id;
   }
+
+  bool get _usesLongPressActivation => widget.longPressActivation != null;
 
   DndDraggableRegistration get _currentRegistration {
     return DndDraggableRegistration(
@@ -167,6 +180,48 @@ class _DndDraggableState extends State<DndDraggable> implements DndDraggableHand
   }
 
   void _handlePanStart(DragStartDetails details, {required bool fromHandle}) {
+    if (_usesLongPressActivation) {
+      return;
+    }
+
+    _startPointerSensor(_pointFromOffset(details.globalPosition), fromHandle: fromHandle);
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (!_usesLongPressActivation) {
+      return;
+    }
+
+    _startPointerSensor(_pointFromOffset(event.position), fromHandle: false);
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!_usesLongPressActivation) {
+      return;
+    }
+
+    _pointerSensor?.move(_pointFromOffset(event.position));
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    if (!_usesLongPressActivation) {
+      return;
+    }
+
+    _pointerSensor?.end();
+    _pointerSensor = null;
+    _handlePointerActive = false;
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    if (!_usesLongPressActivation) {
+      return;
+    }
+
+    _cancelDrag(reason: DndCancelReason.sensor);
+  }
+
+  void _startPointerSensor(DndPoint initialPointer, {required bool fromHandle}) {
     final startedFromHandle = fromHandle || _handlePointerActive;
     if (_handleCount > 0 && !startedFromHandle) {
       return;
@@ -188,12 +243,11 @@ class _DndDraggableState extends State<DndDraggable> implements DndDraggableHand
       controller.measuring.updateDraggableRect(widget.id, activeRect);
     }
 
-    final initialPointer = _pointFromOffset(details.globalPosition);
     final sensor = DndPointerSensor(
       controller: controller,
       activeRect: activeRect,
-      constraint: widget.activationConstraint,
-      onDragStart: widget.onDragStart,
+      constraint: _effectiveActivationConstraint,
+      onDragStart: _handleDragStart,
       onDragMove: widget.onDragMove,
       onDragEnd: widget.onDragEnd,
       onDragCancel: widget.onDragCancel,
@@ -206,6 +260,26 @@ class _DndDraggableState extends State<DndDraggable> implements DndDraggableHand
         inputKind: DndInputKind.pointer,
       ),
     );
+  }
+
+  DndSensorActivationConstraint get _effectiveActivationConstraint {
+    final longPressActivation = widget.longPressActivation;
+    if (longPressActivation == null) {
+      return widget.activationConstraint;
+    }
+
+    return DndSensorActivationConstraint(
+      delay: longPressActivation.delay,
+      tolerance: longPressActivation.tolerance,
+    );
+  }
+
+  void _handleDragStart(DndDragStartEvent event) {
+    if (widget.longPressActivation?.hapticFeedback == true) {
+      unawaited(HapticFeedback.selectionClick());
+    }
+
+    widget.onDragStart?.call(event);
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
@@ -254,18 +328,25 @@ class _DndDraggableState extends State<DndDraggable> implements DndDraggableHand
   Widget build(BuildContext context) {
     return DndDraggableHandleScope(
       draggable: this,
-      child: GestureDetector(
-        key: _measureKey,
+      child: Listener(
         behavior: widget.hitTestBehavior ?? HitTestBehavior.opaque,
-        onPanStart: widget.disabled
-            ? null
-            : (details) {
-                _handlePanStart(details, fromHandle: false);
-              },
-        onPanUpdate: widget.disabled ? null : _handlePanUpdate,
-        onPanEnd: widget.disabled ? null : _handlePanEnd,
-        onPanCancel: widget.disabled ? null : _handlePanCancel,
-        child: widget.child,
+        onPointerDown: widget.disabled ? null : _handlePointerDown,
+        onPointerMove: widget.disabled ? null : _handlePointerMove,
+        onPointerUp: widget.disabled ? null : _handlePointerUp,
+        onPointerCancel: widget.disabled ? null : _handlePointerCancel,
+        child: GestureDetector(
+          key: _measureKey,
+          behavior: widget.hitTestBehavior ?? HitTestBehavior.opaque,
+          onPanStart: widget.disabled || _usesLongPressActivation
+              ? null
+              : (details) {
+                  _handlePanStart(details, fromHandle: false);
+                },
+          onPanUpdate: widget.disabled || _usesLongPressActivation ? null : _handlePanUpdate,
+          onPanEnd: widget.disabled || _usesLongPressActivation ? null : _handlePanEnd,
+          onPanCancel: widget.disabled || _usesLongPressActivation ? null : _handlePanCancel,
+          child: widget.child,
+        ),
       ),
     );
   }
