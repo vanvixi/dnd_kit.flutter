@@ -1,5 +1,10 @@
 /// Pure Dart core primitives and algorithms for dnd_kit.
 ///
+/// This library has no Flutter dependency. It exposes stable identifiers,
+/// geometry primitives, drag state, events, collision detectors, modifiers,
+/// sensor contracts, registry contracts, and diagnostics used by the Flutter
+/// package.
+///
 library;
 
 export 'src/geometry.dart';

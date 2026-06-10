@@ -64,3 +64,14 @@ First story: `docs/stories/phase-8-production-hardening/US-031-release-quality-w
 Package polish before release also collapses the old umbrella-only `dnd_kit`
 role into the primary Flutter package through
 `docs/stories/phase-8-production-hardening/US-035-main-package-rename-and-umbrella-collapse.md`.
+
+## Phase 9 - V1 Release Readiness
+
+Prepare the renamed package for external review and publication:
+
+- package-facing README and changelog;
+- public API documentation polish;
+- stale example documentation cleanup;
+- publish dry-run and release metadata checks.
+
+First story: `docs/stories/phase-9-release-readiness/US-036-docs-api-polish-before-release.md`.

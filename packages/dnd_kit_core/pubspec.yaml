@@ -2,6 +2,13 @@ name: dnd_kit_core
 description: Pure Dart core primitives and algorithms for dnd_kit.
 version: 0.1.0-dev.0
 publish_to: none
+repository: https://github.com/vanvixi/dnd_kit.flutter
+issue_tracker: https://github.com/vanvixi/dnd_kit.flutter/issues
+topics:
+  - drag-and-drop
+  - dnd
+  - geometry
+  - sortable
 
 environment:
   sdk: ">=3.5.0 <4.0.0"

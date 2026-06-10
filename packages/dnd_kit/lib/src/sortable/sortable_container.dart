@@ -47,8 +47,8 @@ final class SortableContainer {
 abstract final class SortableMultiContainer {
   /// Builds move intent details for a drag ending over an item or container.
   ///
-  /// If [event.overId] is a container id, the move targets the end of that
-  /// container. If [event.overId] is an item id, the move targets that item's
+  /// If the event's `overId` is a container id, the move targets the end of
+  /// that container. If `overId` is an item id, the move targets that item's
   /// index in its container.
   static SortableMoveDetails? moveDetailsFor(
     DndDragEndEvent event, {

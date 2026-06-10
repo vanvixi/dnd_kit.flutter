@@ -1,0 +1,13 @@
+# Changelog
+
+## 0.1.0-dev.0
+
+- Initial development release of the main `dnd_kit` Flutter package.
+- Includes core drag/drop widgets, scope/controller APIs, pointer, long-press,
+  and keyboard activation, measuring, collision runtime, modifiers, drag
+  overlays, visual state builders, auto-scroll, diagnostics, and stable
+  sortable list/grid presets.
+- Exposes the pure Dart `dnd_kit_core` API through the main package for
+  application convenience.
+- Keeps experimental multi-container sortable helpers out of the stable
+  same-container sortable contract.

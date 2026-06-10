@@ -1,5 +1,19 @@
 /// Flutter drag-and-drop toolkit with sortable presets.
 ///
+/// Import this library from Flutter applications:
+///
+/// ```dart
+/// import 'package:dnd_kit/dnd_kit.dart';
+/// ```
+///
+/// The package provides the widget layer around the pure Dart core:
+/// [DndScope], [DndController], [DndDraggable], [DndDroppable],
+/// [DndDragOverlay], auto-scroll helpers, and stable sortable APIs such as
+/// [SortableScope] and [SortableItem].
+///
+/// Applications own their item, board, or document data. `dnd_kit` reports
+/// drag/drop and sortable move intent so app code can update its own state.
+///
 library;
 
 export 'package:dnd_kit_core/dnd_kit_core.dart';
