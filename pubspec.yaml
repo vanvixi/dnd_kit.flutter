@@ -8,6 +8,7 @@ workspace:
   - packages/dnd_kit_core
   - packages/dnd_kit
   - examples/kanban_board
+  - examples/basic_drag_drop
 
 dev_dependencies:
   lints: ^5.0.0
