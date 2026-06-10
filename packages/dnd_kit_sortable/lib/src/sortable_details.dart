@@ -9,11 +9,18 @@ final class SortableMoveDetails {
   const SortableMoveDetails({
     required this.activeId,
     required this.overId,
-    required this.oldIndex,
-    required this.newIndex,
-    this.containerId,
+    required int oldIndex,
+    required int newIndex,
+    DndId? containerId,
+    DndId? fromContainerId,
+    DndId? toContainerId,
+    int? fromIndex,
+    int? toIndex,
     this.event,
-  });
+  })  : fromContainerId = fromContainerId ?? containerId,
+        toContainerId = toContainerId ?? containerId,
+        fromIndex = fromIndex ?? oldIndex,
+        toIndex = toIndex ?? newIndex;
 
   /// The sortable item being moved.
   final DndId activeId;
@@ -21,14 +28,30 @@ final class SortableMoveDetails {
   /// The sortable item the active item was dropped over.
   final DndId overId;
 
+  /// The source container id, when the move is associated with a container.
+  final DndId? fromContainerId;
+
+  /// The destination container id, when the move is associated with a container.
+  final DndId? toContainerId;
+
+  /// The active item's index in its source container before the move.
+  final int fromIndex;
+
+  /// The target index in the destination container.
+  final int toIndex;
+
   /// The active item's index in the scope's item order before the move.
-  final int oldIndex;
+  int get oldIndex => fromIndex;
 
   /// The target index in the scope's item order.
-  final int newIndex;
+  int get newIndex => toIndex;
 
-  /// Optional sortable container id for future multi-container APIs.
-  final DndId? containerId;
+  /// The sortable container id for same-container moves.
+  ///
+  /// Cross-container moves expose [fromContainerId] and [toContainerId] instead.
+  DndId? get containerId {
+    return fromContainerId == toContainerId ? fromContainerId : null;
+  }
 
   /// The lower-level drag end event that produced this move intent.
   final DndDragEndEvent? event;
@@ -38,9 +61,10 @@ final class SortableMoveDetails {
     return other is SortableMoveDetails &&
         other.activeId == activeId &&
         other.overId == overId &&
-        other.oldIndex == oldIndex &&
-        other.newIndex == newIndex &&
-        other.containerId == containerId &&
+        other.fromContainerId == fromContainerId &&
+        other.toContainerId == toContainerId &&
+        other.fromIndex == fromIndex &&
+        other.toIndex == toIndex &&
         other.event == event;
   }
 
@@ -49,9 +73,10 @@ final class SortableMoveDetails {
     return Object.hash(
       activeId,
       overId,
-      oldIndex,
-      newIndex,
-      containerId,
+      fromContainerId,
+      toContainerId,
+      fromIndex,
+      toIndex,
       event,
     );
   }
@@ -59,7 +84,8 @@ final class SortableMoveDetails {
   @override
   String toString() {
     return 'SortableMoveDetails(activeId: $activeId, overId: $overId, '
-        'oldIndex: $oldIndex, newIndex: $newIndex, containerId: $containerId, '
+        'fromContainerId: $fromContainerId, toContainerId: $toContainerId, '
+        'fromIndex: $fromIndex, toIndex: $toIndex, '
         'event: $event)';
   }
 }
