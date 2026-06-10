@@ -9,6 +9,7 @@ workspace:
   - packages/dnd_kit
   - examples/kanban_board
   - examples/basic_drag_drop
+  - examples/multi_container_sortable
 
 dev_dependencies:
   lints: ^5.0.0
@@ -27,3 +28,4 @@ melos:
         dart test packages/dnd_kit_core
         flutter test packages/dnd_kit
         flutter test examples/kanban_board
+        flutter test examples/multi_container_sortable
