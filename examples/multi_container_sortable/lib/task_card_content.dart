@@ -92,9 +92,9 @@ class TaskCardContent extends StatelessWidget {
           Text(
             task.title,
             style: const TextStyle(
+              color: Colors.white,
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
             ),
           ),
           const SizedBox(height: 6),

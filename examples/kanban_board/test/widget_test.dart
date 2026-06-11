@@ -104,8 +104,7 @@ void main() {
       isTrue,
       reason: 'there must be a visible gap between task droppables',
     );
-    final gapCenter =
-        Offset(start.dx, (auditRect.bottom + mobileRect.top) / 2);
+    final gapCenter = Offset(start.dx, (auditRect.bottom + mobileRect.top) / 2);
 
     final gesture = await tester.startGesture(start);
     await tester.pump();
@@ -123,12 +122,14 @@ void main() {
     expect(
       backlog.tasks.map((t) => t.id).toList(),
       <String>['audit-drops', 'write-brief', 'mobile-pass'],
-      reason: 'write-brief must be inserted between audit-drops and mobile-pass',
+      reason:
+          'write-brief must be inserted between audit-drops and mobile-pass',
     );
   });
 
   // Top-half drop: cursor above target's center → insert BEFORE target.
-  testWidgets('inserts before target when cursor is in top half', (tester) async {
+  testWidgets('inserts before target when cursor is in top half',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 

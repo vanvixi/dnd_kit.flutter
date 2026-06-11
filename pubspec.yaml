@@ -9,6 +9,7 @@ workspace:
   - examples/kanban_board
   - examples/basic_drag_drop
   - examples/multi_container_sortable
+  - examples/example_gallery
 
 dev_dependencies:
   lints: ^5.0.0
@@ -28,3 +29,4 @@ melos:
         flutter test packages/dnd_kit
         flutter test examples/kanban_board
         flutter test examples/multi_container_sortable
+        flutter test examples/example_gallery

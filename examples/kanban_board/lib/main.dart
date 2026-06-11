@@ -186,8 +186,7 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     final nextColumns = _columns.map((column) => column.copyWith()).toList();
     final fromIndex =
         nextColumns.indexWhere((column) => column.id == fromColumnId);
-    final toIndex =
-        nextColumns.indexWhere((column) => column.id == toColumnId);
+    final toIndex = nextColumns.indexWhere((column) => column.id == toColumnId);
     if (fromIndex == -1 || toIndex == -1) {
       return;
     }
@@ -199,8 +198,7 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     }
 
     final task = fromTasks.removeAt(taskIndex);
-    nextColumns[fromIndex] =
-        nextColumns[fromIndex].copyWith(tasks: fromTasks);
+    nextColumns[fromIndex] = nextColumns[fromIndex].copyWith(tasks: fromTasks);
 
     if (fromColumnId != toColumnId) {
       setState(() {
@@ -245,8 +243,7 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     required Map<DndId, DndRect> droppableRects,
   }) {
     final nextColumns = _columns.map((column) => column.copyWith()).toList();
-    final toIndex =
-        nextColumns.indexWhere((column) => column.id == toColumnId);
+    final toIndex = nextColumns.indexWhere((column) => column.id == toColumnId);
     if (toIndex == -1) {
       return;
     }

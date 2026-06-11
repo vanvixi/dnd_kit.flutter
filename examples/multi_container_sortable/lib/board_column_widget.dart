@@ -103,9 +103,9 @@ class BoardColumnWidget extends StatelessWidget {
                       child: Text(
                         _title,
                         style: const TextStyle(
+                          color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
