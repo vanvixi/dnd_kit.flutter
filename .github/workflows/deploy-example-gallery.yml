@@ -28,6 +28,9 @@ jobs:
         with:
           flutter-version-file: .fvmrc
 
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Install dependencies
         run: flutter pub get
 

@@ -89,3 +89,6 @@ None expected.
   `fvm flutter test examples/example_gallery`, `fvm dart analyze`,
   `cd examples/example_gallery && fvm flutter build web --release --base-href /dnd_kit.flutter/`,
   `fvm dart run melos run validate`, and `git diff --check`.
+- Deployment workflow includes `actions/configure-pages@v5`; the repository
+  still must have GitHub Pages enabled with source set to GitHub Actions in
+  repository settings before `actions/deploy-pages` can create a deployment.
