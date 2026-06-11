@@ -51,6 +51,8 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
   late List<KanbanColumn> _columns;
   late DndController _controller;
   late ScrollController _boardScrollController;
+  String? _indicatorColumnId;
+  int? _indicatorIndex;
 
   @override
   void initState() {
@@ -59,6 +61,7 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     _controller =
         DndController(collisionDetector: kanbanBoardCollisionDetector);
     _boardScrollController = ScrollController();
+    _controller.addListener(_syncDropIndicator);
   }
 
   @override
@@ -71,9 +74,76 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
 
   @override
   void dispose() {
+    _controller.removeListener(_syncDropIndicator);
     _boardScrollController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _syncDropIndicator() {
+    if (!_controller.isDragging) {
+      _clearIndicator();
+      return;
+    }
+
+    final session = _controller.activeSession;
+    final activeId = _controller.activeId;
+    if (session == null || activeId == null) return;
+
+    final overId = _controller.overId;
+    final dropData =
+        overId == null ? null : _controller.registry.droppable(overId)?.data;
+    final dragData = _controller.registry.draggable(activeId)?.data;
+    if (dropData is! KanbanDropData || dragData is! KanbanTaskDragData) {
+      _clearIndicator();
+      return;
+    }
+
+    final colIdx = _columns.indexWhere((c) => c.id == dropData.columnId);
+    if (colIdx == -1) return;
+    final column = _columns[colIdx];
+
+    final tasksWithoutDragged = dropData.columnId == dragData.columnId
+        ? column.tasks.where((t) => t.id != dragData.taskId).toList()
+        : column.tasks.toList();
+
+    final insertionIndex = _computeInsertionIndex(
+      columnTasks: tasksWithoutDragged,
+      pointer: session.currentPointer,
+      droppableRects: _controller.measuring.droppableRects,
+      targetTaskId: dropData.taskId,
+    );
+
+    // Convert "index in list without dragged" → "visual index in full list"
+    // because the dragged task is still rendered (at 36% opacity) at its
+    // original slot, shifting the visual positions after it.
+    int visualIndex;
+    if (dropData.columnId == dragData.columnId) {
+      final draggedOrigIdx =
+          column.tasks.indexWhere((t) => t.id == dragData.taskId);
+      visualIndex = (draggedOrigIdx != -1 && draggedOrigIdx < insertionIndex)
+          ? insertionIndex + 1
+          : insertionIndex;
+    } else {
+      visualIndex = insertionIndex;
+    }
+
+    if (_indicatorColumnId != dropData.columnId ||
+        _indicatorIndex != visualIndex) {
+      setState(() {
+        _indicatorColumnId = dropData.columnId;
+        _indicatorIndex = visualIndex;
+      });
+    }
+  }
+
+  void _clearIndicator() {
+    if (_indicatorColumnId != null) {
+      setState(() {
+        _indicatorColumnId = null;
+        _indicatorIndex = null;
+      });
+    }
   }
 
   void _handleDragEnd(DndDragEndEvent event) {
@@ -86,17 +156,17 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
       return;
     }
 
-    final targetRect = _controller.measuring.droppableRect(overId!);
-    final insertAfter = dropData.taskId != null &&
-        targetRect != null &&
-        event.currentPointer.y > targetRect.center.y;
+    final pointer = event.currentPointer;
+    final droppableRects =
+        Map<DndId, DndRect>.from(_controller.measuring.droppableRects);
 
     _moveTask(
       taskId: dragData.taskId,
       fromColumnId: dragData.columnId,
       toColumnId: dropData.columnId,
       targetTaskId: dropData.taskId,
-      insertAfter: insertAfter,
+      pointer: pointer,
+      droppableRects: droppableRects,
     );
     _controller.reset();
   }
@@ -106,7 +176,8 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     required String fromColumnId,
     required String toColumnId,
     required String? targetTaskId,
-    required bool insertAfter,
+    required DndPoint pointer,
+    required Map<DndId, DndRect> droppableRects,
   }) {
     if (fromColumnId == toColumnId && taskId == targetTaskId) {
       return;
@@ -115,7 +186,8 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     final nextColumns = _columns.map((column) => column.copyWith()).toList();
     final fromIndex =
         nextColumns.indexWhere((column) => column.id == fromColumnId);
-    final toIndex = nextColumns.indexWhere((column) => column.id == toColumnId);
+    final toIndex =
+        nextColumns.indexWhere((column) => column.id == toColumnId);
     if (fromIndex == -1 || toIndex == -1) {
       return;
     }
@@ -127,7 +199,8 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     }
 
     final task = fromTasks.removeAt(taskIndex);
-    nextColumns[fromIndex] = nextColumns[fromIndex].copyWith(tasks: fromTasks);
+    nextColumns[fromIndex] =
+        nextColumns[fromIndex].copyWith(tasks: fromTasks);
 
     if (fromColumnId != toColumnId) {
       setState(() {
@@ -141,19 +214,21 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
           task: task,
           toColumnId: toColumnId,
           targetTaskId: targetTaskId,
-          insertAfter: insertAfter,
+          pointer: pointer,
+          droppableRects: droppableRects,
         );
       });
       return;
     }
 
-    final targetTasks = nextColumns[toIndex].tasks.toList();
-    _insertTaskIntoList(
-      targetTasks,
-      task: task,
+    final insertionIndex = _computeInsertionIndex(
+      columnTasks: nextColumns[toIndex].tasks,
+      pointer: pointer,
+      droppableRects: droppableRects,
       targetTaskId: targetTaskId,
-      insertAfter: insertAfter,
     );
+    final targetTasks = nextColumns[toIndex].tasks.toList()
+      ..insert(insertionIndex, task);
     nextColumns[toIndex] = nextColumns[toIndex].copyWith(tasks: targetTasks);
 
     setState(() {
@@ -166,21 +241,24 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     required KanbanTask task,
     required String toColumnId,
     required String? targetTaskId,
-    required bool insertAfter,
+    required DndPoint pointer,
+    required Map<DndId, DndRect> droppableRects,
   }) {
     final nextColumns = _columns.map((column) => column.copyWith()).toList();
-    final toIndex = nextColumns.indexWhere((column) => column.id == toColumnId);
+    final toIndex =
+        nextColumns.indexWhere((column) => column.id == toColumnId);
     if (toIndex == -1) {
       return;
     }
 
-    final targetTasks = nextColumns[toIndex].tasks.toList();
-    _insertTaskIntoList(
-      targetTasks,
-      task: task,
+    final insertionIndex = _computeInsertionIndex(
+      columnTasks: nextColumns[toIndex].tasks,
+      pointer: pointer,
+      droppableRects: droppableRects,
       targetTaskId: targetTaskId,
-      insertAfter: insertAfter,
     );
+    final targetTasks = nextColumns[toIndex].tasks.toList()
+      ..insert(insertionIndex, task);
     nextColumns[toIndex] = nextColumns[toIndex].copyWith(tasks: targetTasks);
 
     setState(() {
@@ -189,23 +267,44 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     widget.onChanged?.call(_columns);
   }
 
-  void _insertTaskIntoList(
-    List<KanbanTask> targetTasks, {
-    required KanbanTask task,
-    required String? targetTaskId,
-    required bool insertAfter,
+  int _computeInsertionIndex({
+    required List<KanbanTask> columnTasks,
+    required DndPoint pointer,
+    required Map<DndId, DndRect> droppableRects,
+    String? targetTaskId,
   }) {
-    var insertionIndex = targetTaskId == null
-        ? targetTasks.length
-        : targetTasks.indexWhere((task) => task.id == targetTaskId);
-    if (insertionIndex == -1) {
-      insertionIndex = targetTasks.length;
+    if (targetTaskId != null) {
+      final idx = columnTasks.indexWhere((t) => t.id == targetTaskId);
+      if (idx != -1) {
+        final rect = droppableRects[taskDndId(targetTaskId)];
+        if (rect != null) {
+          return pointer.y > rect.center.y ? idx + 1 : idx;
+        }
+        return idx;
+      }
     }
-    if (insertAfter && targetTaskId != null) {
-      insertionIndex += 1;
+
+    // Gap/column drop: compare pointer against sorted task centers.
+    final measured = <(KanbanTask, DndRect)>[];
+    for (final task in columnTasks) {
+      final rect = droppableRects[taskDndId(task.id)];
+      if (rect != null) {
+        measured.add((task, rect));
+      }
     }
-    insertionIndex = insertionIndex.clamp(0, targetTasks.length);
-    targetTasks.insert(insertionIndex, task);
+    if (measured.isEmpty) {
+      return 0;
+    }
+    measured.sort((a, b) => a.$2.center.y.compareTo(b.$2.center.y));
+    var index = 0;
+    for (final (_, rect) in measured) {
+      if (pointer.y > rect.center.y) {
+        index += 1;
+      } else {
+        break;
+      }
+    }
+    return index;
   }
 
   KanbanTask? _taskFor(DndId id) {
@@ -213,7 +312,6 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
     if (taskId == null) {
       return null;
     }
-
     for (final column in _columns) {
       for (final task in column.tasks) {
         if (task.id == taskId) {
@@ -259,6 +357,10 @@ class _KanbanBoardExampleState extends State<KanbanBoardExample> {
                             'column-view:${_columns[index].id}'),
                         column: _columns[index],
                         onDragEnd: _handleDragEnd,
+                        dropIndicatorIndex:
+                            _indicatorColumnId == _columns[index].id
+                                ? _indicatorIndex
+                                : null,
                       ),
                       if (index != _columns.length - 1)
                         const SizedBox(width: 16),

@@ -68,6 +68,107 @@ void main() {
       <String>['audit-drops', 'write-brief', 'mobile-pass'],
     );
   });
+
+  // Regression: dropping in the gap between tasks (column droppable hit,
+  // taskId == null). Old code appended to end; pointer-based logic finds
+  // the correct position by comparing cursor against sorted task centers.
+  testWidgets(
+      'places task at correct position when dropped in gap between items',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final snapshots = <List<KanbanColumn>>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: KanbanBoardExample(onChanged: snapshots.add),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Initial backlog: [write-brief(0), audit-drops(1), mobile-pass(2)].
+    // Drag write-brief into the 10-px padding gap between audit-drops and
+    // mobile-pass. pointerWithin hits only the column droppable (taskId==null).
+    // Expected: [audit-drops, write-brief, mobile-pass].
+    final start = tester.getCenter(
+      find.byKey(const ValueKey<String>('drag:write-brief')),
+    );
+    final auditRect = tester.getRect(
+      find.byKey(const ValueKey<String>('task-drop:audit-drops')),
+    );
+    final mobileRect = tester.getRect(
+      find.byKey(const ValueKey<String>('task-drop:mobile-pass')),
+    );
+    expect(
+      mobileRect.top > auditRect.bottom,
+      isTrue,
+      reason: 'there must be a visible gap between task droppables',
+    );
+    final gapCenter =
+        Offset(start.dx, (auditRect.bottom + mobileRect.top) / 2);
+
+    final gesture = await tester.startGesture(start);
+    await tester.pump();
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await gesture.moveTo(Offset.lerp(start, gapCenter, 0.55)!);
+    await tester.pump();
+    await gesture.moveTo(gapCenter);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(snapshots, isNotEmpty);
+    final backlog = snapshots.last.singleWhere((c) => c.id == 'backlog');
+    expect(
+      backlog.tasks.map((t) => t.id).toList(),
+      <String>['audit-drops', 'write-brief', 'mobile-pass'],
+      reason: 'write-brief must be inserted between audit-drops and mobile-pass',
+    );
+  });
+
+  // Top-half drop: cursor above target's center → insert BEFORE target.
+  testWidgets('inserts before target when cursor is in top half', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final snapshots = <List<KanbanColumn>>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: KanbanBoardExample(onChanged: snapshots.add),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Drag audit-drops (idx 1) to 20 px ABOVE write-brief center (top half).
+    // Cursor < write-brief.center.y → insertAfter = false → index = 0.
+    // Expected: [audit-drops, write-brief, mobile-pass].
+    final writeBriefCenter = tester.getCenter(
+      find.byKey(const ValueKey<String>('task:write-brief')),
+    );
+    final start = tester.getCenter(
+      find.byKey(const ValueKey<String>('drag:audit-drops')),
+    );
+    final end = Offset(start.dx, writeBriefCenter.dy - 20);
+
+    final gesture = await tester.startGesture(start);
+    await tester.pump();
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await gesture.moveTo(Offset.lerp(start, end, 0.55)!);
+    await tester.pump();
+    await gesture.moveTo(end);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(snapshots, isNotEmpty);
+    final backlog = snapshots.last.singleWhere((c) => c.id == 'backlog');
+    expect(
+      backlog.tasks.map((t) => t.id).toList(),
+      <String>['audit-drops', 'write-brief', 'mobile-pass'],
+    );
+  });
 }
 
 Future<void> _drag(

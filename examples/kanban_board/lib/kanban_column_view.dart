@@ -10,10 +10,12 @@ class KanbanColumnView extends StatefulWidget {
     super.key,
     required this.column,
     required this.onDragEnd,
+    this.dropIndicatorIndex,
   });
 
   final KanbanColumn column;
   final DndDragEndCallback onDragEnd;
+  final int? dropIndicatorIndex;
 
   @override
   State<KanbanColumnView> createState() => _KanbanColumnViewState();
@@ -59,7 +61,7 @@ class _KanbanColumnViewState extends State<KanbanColumnView> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: <Widget>[
                   Expanded(
@@ -91,26 +93,34 @@ class _KanbanColumnViewState extends State<KanbanColumnView> {
                   child: Column(
                     children: <Widget>[
                       for (var index = 0;
-                          index < widget.column.tasks.length;
-                          index += 1)
-                        Padding(
-                          key: ValueKey<String>(
-                            'task-padding:${widget.column.tasks[index].id}',
-                          ),
-                          padding: EdgeInsets.only(
-                            bottom: index == widget.column.tasks.length - 1
-                                ? 0
-                                : 10,
-                          ),
-                          child: KanbanTaskTile(
+                          index <= widget.column.tasks.length;
+                          index += 1) ...<Widget>[
+                        if (widget.dropIndicatorIndex == index)
+                          _buildDropIndicator(),
+                        if (index < widget.column.tasks.length)
+                          Padding(
                             key: ValueKey<String>(
-                              'task-tile:${widget.column.tasks[index].id}',
+                              'task-padding:${widget.column.tasks[index].id}',
                             ),
-                            columnId: widget.column.id,
-                            task: widget.column.tasks[index],
-                            onDragEnd: widget.onDragEnd,
+                            padding: EdgeInsets.only(
+                              // Remove bottom gap when the indicator immediately
+                              // follows — the Divider's own height fills it.
+                              bottom: (index ==
+                                          widget.column.tasks.length - 1 ||
+                                      widget.dropIndicatorIndex == index + 1)
+                                  ? 0
+                                  : 12,
+                            ),
+                            child: KanbanTaskTile(
+                              key: ValueKey<String>(
+                                'task-tile:${widget.column.tasks[index].id}',
+                              ),
+                              columnId: widget.column.id,
+                              task: widget.column.tasks[index],
+                              onDragEnd: widget.onDragEnd,
+                            ),
                           ),
-                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -121,4 +131,10 @@ class _KanbanColumnViewState extends State<KanbanColumnView> {
       ),
     );
   }
+
+  Widget _buildDropIndicator() => const Divider(
+        height: 12,
+        // thickness: 2,
+        color: Color(0xff2f6f73),
+      );
 }

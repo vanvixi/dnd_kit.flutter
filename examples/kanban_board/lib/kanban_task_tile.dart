@@ -26,20 +26,6 @@ class KanbanTaskTile extends StatelessWidget {
         columnId: columnId,
         taskId: task.id,
       ),
-      builder: (context, details, child) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color:
-                  details.isOver ? const Color(0xff2f6f73) : Colors.transparent,
-              width: 2,
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: child,
-        );
-      },
       child: DndDraggable(
         key: ValueKey<String>('drag:${task.id}'),
         id: id,
